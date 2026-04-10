@@ -65,15 +65,17 @@ plt.grid(alpha=0.3)          # Προσθήκη πλέγματος για καλ
 plt.show()
 
 plt.figure(figsize=(12,6))
-unique_events = merged["EventType"].unique()  # Παίρνει όλα τα είδη εκδηλώσεων
+unique_events = merged["EventType"].dropna().unique()  # Παίρνει όλα τα είδη εκδηλώσεων, αγνοώντας τις κενές τιμές
 palette = sns.color_palette("tab10", len(unique_events))  # Δημιουργία χρωματικής παλέτας 'tab10' με τόσα χρώματα όσα τα μοναδικά είδη εκδηλώσεων
 sns.barplot(               # Δημιουργία γραφήματος  Barplot: Μέση πληρότητα parking ανά είδος εκδήλωσης
     data=merged,
     x="EventType",
     y="ParkingOccupancy",
     estimator="mean",      # Υπολογισμός μέσης πληρότητας πάρκινγκ
-    ci=None,
-    palette=palette        # Απόδοση διαφορετικού χρώματος σε κάθε κατηγορία
+    errorbar=None,
+    hue="EventType",       # Το χρώμα κάθε μπάρας εξαρτάται από το EventType
+    palette=palette,       # Χρήση της παλέτας που ορίσαμε πριν για την απόδοση διαφορετικού χρώματος σε κάθε κατηγορία 
+    legend=False           # Απενεργοποίηση του legend 
 )
 plt.title("Μέση Πληρότητα Parking ανά Είδος Εκδήλωσης (EventType)")
 plt.xlabel("Είδος Εκδήλωσης")
