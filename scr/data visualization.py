@@ -5,8 +5,8 @@ import plotly.express as px # Εύχρηστη βιβλιοθήκη της Plotl
 import plotly.graph_objects as go # Βιβλιοθήκη πιο προχωρημένη για λεπτομερή προσαρμογή διαδραστικών γραφημάτων (προσθήκη traces, dropdown menus κ.λπ.)
 
 # Φόρτωση των 2 datasets και αποθήκευση στα dataframes mobility και events 
-mobility = pd.read_csv("urban_mobility_kozani_2025.csv") # Διαβάζει το αρχείο CSV και το αποθηκεύει στο dataframe mobility
-events = pd.read_csv("local_events_kozani_2025.csv")     # Διαβάζει το αρχείο CSV και το αποθηκεύει στο dataframe events
+mobility = pd.read_csv("data/urban_mobility_kozani_2025.csv") # Διαβάζει το αρχείο CSV και το αποθηκεύει στο dataframe mobility
+events = pd.read_csv("data/local_events_kozani_2025.csv")     # Διαβάζει το αρχείο CSV και το αποθηκεύει στο dataframe events
 
 # Μετατροπή της κοινής στήλης Date των 2 datasets από string σε τύπο ημερομηνίας 
 mobility["Date"] = pd.to_datetime(mobility["Date"])
