@@ -1,0 +1,185 @@
+import pandas as pd # Βιβλιοθήκη για επεξεργασία και ανάλυση δεδομένων (π.χ. CSV, Excel, DataFrames)
+import matplotlib.pyplot as plt # Βασική βιβλιοθήκη για δημιουργία στατικών γραφημάτων  
+import seaborn as sns # Βιβλιοθήκη βασισμένη στο Matplotlib για στατιστική οπτικοποίηση με έτοιμα γραφήματα (στατικά) με πιο όμορφο στυλ
+import plotly.express as px # Εύχρηστη βιβλιοθήκη της Plotly για γρήγορη δημιουργία διαδραστικών γραφημάτων
+import plotly.graph_objects as go # Βιβλιοθήκη πιο προχωρημένη για λεπτομερή προσαρμογή διαδραστικών γραφημάτων (προσθήκη traces, dropdown menus κ.λπ.)
+
+# Φόρτωση των 2 datasets και αποθήκευση στα dataframes mobility και events 
+mobility = pd.read_csv("urban_mobility_kozani_2025.csv") # Διαβάζει το αρχείο CSV και το αποθηκεύει στο dataframe mobility
+events = pd.read_csv("local_events_kozani_2025.csv")     # Διαβάζει το αρχείο CSV και το αποθηκεύει στο dataframe events
+
+# Μετατροπή της κοινής στήλης Date των 2 datasets από string σε τύπο ημερομηνίας 
+mobility["Date"] = pd.to_datetime(mobility["Date"])
+events["Date"] = pd.to_datetime(events["Date"])
+
+# Συγχώνευση των 2 datasets με βάση τη στήλη Date & Αποθήκευση του συγχωνευμένου dataset σε νέο αρχείο CSV με όνομα merged_dataset.csv
+merged = pd.merge(mobility, events, on="Date", how="left")
+merged.to_csv("merged_dataset.csv", index=False)
+
+# Χρήση της Date ως Index & Μετατροπή του Index σε DatetimeIndex (χρήσιμο για χρονοσειρές και αποφυγή warnings)
+merged.set_index("Date", inplace=True) # inplace=True δηλαδή, οι αλλαγές εφαρμόζονται στο ίδιο το dataframe 
+merged.index = pd.DatetimeIndex(merged.index)
+
+# Mobility cleansing για τα  missing values - γεμίζει κάθε NaN με την τελευταία διαθέσιμη τιμή
+cols_to_ffill = [   # Δημιουργία λίστας με τις στήλες του συγχωνευμένου dataframe merged που πρόκειται να καθαριστούν απο κενές τιμές
+    "BusPassengers",
+    "BikeTrips",
+    "ParkingOccupancy",
+    "TrafficCount",
+    "TransportStrainIndex"
+]
+merged[cols_to_ffill] = merged[cols_to_ffill].ffill() # Συμπλήρωση των NaN με την προηγούμενη έγκυρη τιμή (forward fill)
+
+# Εvent cleansing για τα  missing values των στηλών Attendance και VenueCapacity- γεμίζει κάθε NaN με την τιμή 0
+merged["Attendance"] = merged["Attendance"].fillna(0)
+merged["VenueCapacity"] = merged["VenueCapacity"].fillna(0)
+
+# Εξαγωγή μήνα και ημέρας 
+merged["Month"] = merged.index.month  # Εξαγωγή μήνα και αποθήκευση σε νέα στήλη Mοnth  
+merged["Day"] = merged.index.day      # Εξαγωγή ημέρας και αποθήκευση σε νέα στήλη Day
+
+# Διανυσματοποιημένη πράξη με NumPy arrays: Υπολογισμός της Βαθμολογίας Προτίμησης Δημόσιων Μεταφορών PT_Score
+merged["PT_Score"] = (merged["BusPassengers"].to_numpy()    # Μετατροπή της στήλης BusPassengers σε NumPy array για γρήγορο υπολογισμό
+                      + merged["BikeTrips"].to_numpy()) \
+                       / merged["TrafficCount"].to_numpy()
+# print(merged.head())
+
+plt.figure(figsize=(10,6))        # Δημιουργία καμβά για το γράφημα (10Χ6)
+sns.histplot(data=merged, x="TrafficCount", kde=True, bins=30, color="blue")  # Δημιουργία Ιστογράμματος για τη στήλη TrafficCount, με μία καμπύλη KDE που θα δείχνει την κατανομή των τιμών 
+plt.title("Κατανομή του Όγκου Κυκλοφορίας (TrafficCount)")     # Τίτλος γραφήματος
+plt.xlabel("Traffic Count")       # Τίτλος άξονα Χ
+plt.ylabel("Συχνότητα")           # Τίτλος άξονα Υ
+plt.show()                        # Εμφάνιση γραφήματος
+
+plt.figure(figsize=(14,6))
+sns.lineplot(                # Δημιουργία γραφήματος τάσης
+    data=merged,
+    x=merged.index,          # Ημερομηνίες (Index)
+    y="BikeTrips",           # Μεταβλητή για τη χρήση κοινόχρηστων ποδηλάτων
+    color="green"
+)
+plt.title("Τάση Χρήσης Κοινόχρηστων Ποδηλάτων με την Πάροδο του Χρόνου (BikeTrips)")
+plt.xlabel("Ημερομηνία")
+plt.ylabel("Αριθμός Διαδρομών με Ποδήλατο")
+plt.grid(alpha=0.3)          # Προσθήκη πλέγματος για καλύτερη αναγνωσιμότητα
+plt.show()
+
+plt.figure(figsize=(12,6))
+unique_events = merged["EventType"].unique()  # Παίρνει όλα τα είδη εκδηλώσεων
+palette = sns.color_palette("tab10", len(unique_events))  # Δημιουργία χρωματικής παλέτας 'tab10' με τόσα χρώματα όσα τα μοναδικά είδη εκδηλώσεων
+sns.barplot(               # Δημιουργία γραφήματος  Barplot: Μέση πληρότητα parking ανά είδος εκδήλωσης
+    data=merged,
+    x="EventType",
+    y="ParkingOccupancy",
+    estimator="mean",      # Υπολογισμός μέσης πληρότητας πάρκινγκ
+    ci=None,
+    palette=palette        # Απόδοση διαφορετικού χρώματος σε κάθε κατηγορία
+)
+plt.title("Μέση Πληρότητα Parking ανά Είδος Εκδήλωσης (EventType)")
+plt.xlabel("Είδος Εκδήλωσης")
+plt.ylabel("Μέση Πληρότητα Parking (%)")
+plt.xticks(rotation=45)    # Περιστροφή των ετικετών του άξονα Χ κατά 45° για να μην επικαλύπτονται 
+plt.grid(axis="y", alpha=0.3)   # Προσθήκη πλέγματος στον άξονα Υ για καλύτερη αναγνωσιμότητα των τιμών
+plt.show()
+
+
+# Δημιουργία λίστας με όλα τα Event Types (παίρνουμε τη στήλη Event Type του dataframe merged, αφαιρoύμε τις NaN, παίρνουμε τις μοναδικές κατηγορίες και προσφθέτουμε στην αρχή το "All Events" )
+event_types = ["All Events"] + list(merged["EventType"].dropna().unique())
+
+# Δημιουργία ενός κενού διαδραστικού Plotty γραφήματος
+fig1 = go.Figure()
+
+# Προσθήκη του βασικού histogram για όλα τα events (αρχικό trace) στο διαδραστικό γράφημα
+fig1.add_trace(go.Histogram(
+    x=merged["TrafficCount"],  # Δεδομένα του TrafficCount που θα εμφανιστούν στο ιστόγραμμα
+    name="All Events", # Το όνομα του trace όπως θα εμφανίζεται στο dropdown
+    nbinsx=30,         # Χωρίζει τα δεδομένα σε 30 διαστήματα
+    opacity=0.7,       # Διαφάνεια 70% ώστε να μην επικαλύπτονται τα traces όταν εμφανίζονται πολλά
+    visible=True       # Το ιστόγραμμα για all events θα είναι ορατό όταν φορτώνει το γράφημα - Όλα τα άλλα traces (Concert,  etc.) ξεκινούν κρυμμένα
+))
+
+# Προσθήκη Traces για κάθε ξεχωριστό EventType (Cultural, Concert, Sports κλπ.)
+# Όλα τα traces αρχικά είναι κρυφά (visible=False) - Θα ενεργοποιούνται μέσω του dropdown menu
+for evt in event_types[1:]:     # Διατρέχει όλα τα στοιχεία της λίστας, παραλείποντας το πρώτο στοιχείο "All Events"
+    subset = merged[merged["EventType"] == evt]  # Φιλτράρει ανά είδος εκδήλωσης.
+    fig1.add_trace(go.Histogram(
+        x=subset["TrafficCount"],   # Τιμές TrafficCount για το συγκεκριμένο είδος εκδήλωσης
+        name=evt,                   # Ετικέτα του trace στο dropdown
+        nbinsx=30,
+        opacity=0.7,
+        visible=False               # Το trace ξεκινά κρυμμένο· θα εμφανιστεί όταν επιλεγεί από το dropdown
+    ))
+
+# Dropdown Buttons - κάθε κουμπί εμφανίζει μόνο το αντίστοιχο trace
+buttons = []    # Δημιουργία άδειας λίστας που θα περιέχει όλα τα κoυμπιά του dropdown 
+for i, evt in enumerate(event_types):       # Διατρέχει όλα τα event types και ταυτόχρονα δίνει και τη θέση τους (enumerate(event_types)), ώστε να ξέρουμε ποιο trace πρέπει να εμφανιστεί στο dropdown.
+    visibility = [False] * len(event_types) # Πάρε τη λίστα [False] και επανάλαβέ 4 φορές (όσο είναι το πλήθος των στοιχείων του EventType) - κάνει όλα τα traces κρυφά (με τιμή false)
+    visibility[i] = True                    # Θα εμφανίζει ΜΟΝΟ το trace στη θέση i της λίστας visibility
+    buttons.append(                         # Προσθέτει ένα νέο κουμπί στη λίστα buttons
+        dict(                               # Τα κουμπιά είναι σε μορφή dictionary
+            label=evt,                      # Όνομα κουμπιού στο dropdown
+            method="update",                # Ενημέρωση της εμφάνισης του γραφήματος
+            args=[{"visible": visibility}]  # Δείχνει το ορατό trace (Τrue) και κρύβει τα υπόλοιπα (με τιμή False) σύμφωνα με τη λίστα visibility
+        )
+    )
+
+# Ορισμός τίτλου γραφήματος, τίτλων αξόνων και ρυθμίσεων του dropdown στο διαδραστικό γράφημα
+fig1.update_layout(                          # Ρυθμίζει την εμφάνιση και τη διάταξη του διαδραστικού γραφήματος
+    title="Διαδραστικό Ιστόγραμμα για τον κυκλοφοριακό όγκο ανά είδος εκδήλωσης",
+    xaxis_title="Traffic Count",
+    yaxis_title="Frequency",
+    template="plotly_white",                # Θέμα εμφάνισης με λευκό background
+    bargap=0.05,                            # Ορίζει το κενό ανάμεσα στις μπάρες
+    height=600,                             # Ορίζει το ύψος του γραφήματος (figure)
+    updatemenus=[                           # Ρυθμίσεις dropdown menu
+        dict(
+            buttons=buttons,                # Όλα κουμπιά που δημιουργήθηκαν με το loop
+            direction="down",               # Το dropdown ανοίγει προς τα κάτω
+            x=0.5,                          # Θέση dropdown (x)
+            y=1.15,                         # Θέση dropdown (Y)
+            showactive=True                 # Το επιλεγμένο κουμπί εμφανίζεται ως ενεργό
+        )
+    ]
+)
+
+# Εμφάνιση γραφήματος
+fig1.show()
+
+# Δημιουργία διαδραστικού γραφήματος τάσης με το Plotly Express
+fig2 = px.line(
+    merged,             # Το DataFrame που περιέχει όλα τα δεδομένα
+    x=merged.index,     # Στον άξονα Χ εμφανίζει τις ημερομηνίες 
+    y="BikeTrips",      # Στον άξονα Υ εμφανίζει τις ημερήσιες διαδρομές ποδηλάτου
+    title="Τάση Χρήσης Κοινόχρηστων Ποδηλάτων (BikeTrips)",   # Τίτλο γραφήματος
+    labels={"Date": "Ημερομηνία", "BikeTrips": "Αριθμός Διαδρομών"},   # Ετικέτες αξόνων
+    color_discrete_sequence=["green"]   # Ορίζει ότι η γραμμή θα είναι πράσινη
+)
+fig2.show()             # Εμφάνιση γραφήματος
+
+# Δημιουργία διαδραστικού γραφήματος ραβδογράμματος με το Plotly Express
+fig3 = px.bar(
+    merged,
+    x="EventType",      
+    y="ParkingOccupancy",
+    color="EventType",  # Δίνει διαφορετικό χρώμα σε κάθε EventType
+    title="Μέση Πληρότητα Parking ανά Είδος Εκδήλωσης",
+    labels={
+        "EventType": "Είδος Εκδήλωσης",
+        "ParkingOccupancy": "Μέση Πληρότητα (%)"}
+)
+fig3.show()
+
+# Δημιουργία διαδραστικού Scatter Plot: Attendance vs ParkingOccupancy
+fig_scatter = px.scatter(
+    merged,
+    x="Attendance",                       # Μεταβλητή από το dataset των events - άξονας Χ
+    y="ParkingOccupancy",                 # Μεταβλητή από το dataset της κινητικότητας - άξονας Υ
+    color="EventType",                    # Διαφορετικό χρώμα ανά είδος εκδήλωσης
+    title="Συσχέτιση Συμμετοχής Εκδήλωσης και Πληρότητας Parking",
+    labels={
+        "Attendance": "Αναμενόμενη Συμμετοχή",
+        "ParkingOccupancy": "Πληρότητα Parking (%)"
+    },
+    hover_data=["VenueCapacity", "TrafficCount", "BikeTrips"]  # Η πληροφορία που θα εμφανίζεται όταν ο χρήστης κάνει hover
+)
+fig_scatter.show()
